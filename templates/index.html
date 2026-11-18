@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Data Insight Builder - 개설강좌 분석기</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+</head>
+<body>
+  <header class="page-header">
+    <div class="container header-row">
+      <div>
+        <h1>AI Data Insight Builder</h1>
+        <p class="subtitle">
+          코드는 정확히 계산하고, AI는 그 결과를 읽기 쉽게 해석해 줍니다. (구형 엑셀 <code>.xls</code> 전용)
+        </p>
+      </div>
+      <button type="button" id="btn-logout" class="btn secondary hidden">잠금(로그아웃)</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="status-banner" class="banner hidden" role="status"></div>
+
+    <!-- 0. 비밀번호 잠금 화면 -->
+    <section class="card hidden" id="section-auth">
+      <h2>비밀번호 확인</h2>
+      <p class="help-text">
+        이 앱을 사용하려면 <strong>8자리 이상</strong>의 비밀번호를 입력해야 합니다. (<code>.env</code>의 <code>APP_PASSWORD</code>)
+      </p>
+      <div class="row-actions">
+        <input
+          type="password"
+          id="password-input"
+          class="text-input"
+          placeholder="비밀번호 8자리 이상 입력"
+          autocomplete="current-password"
+        />
+        <button type="button" id="btn-login" class="btn primary">잠금 해제</button>
+      </div>
+    </section>
+
+    <div id="app-workspace" class="hidden">
+      <!-- 1. 업로드 영역 -->
+      <section class="card" id="section-upload">
+        <h2>1. 엑셀(.xls) 파일 업로드</h2>
+        <p class="help-text">
+          학교 시스템에서 내려받은 <code>.xls</code> 파일을 선택하세요. 파일은 서버 디스크에 저장되지 않고 메모리에만 잠시 보관됩니다.
+        </p>
+        <div class="row-actions">
+          <input type="file" id="file-input" accept=".xls" />
+          <button type="button" id="btn-inspect" class="btn primary">파일 진단하기</button>
+        </div>
+      </section>
+
+      <!-- 2. 진단 결과 영역 -->
+      <section class="card hidden" id="section-inspect">
+        <h2>2. 파일 진단 결과</h2>
+        <div id="inspect-metrics" class="metrics-grid"></div>
+
+        <h3>경고 및 확인 사항</h3>
+        <ul id="warning-list" class="warning-list"></ul>
+
+        <h3>데이터 미리보기 (상위 5행)</h3>
+        <div class="table-wrap">
+          <table id="preview-table"></table>
+        </div>
+      </section>
+
+      <!-- 3. 분석 선택 (직접 질문 + AI 제안) -->
+      <section class="card hidden" id="section-suggest">
+        <h2>3. 분석 선택 (직접 질문 또는 AI 제안)</h2>
+
+        <div class="ask-box">
+          <h3>질문으로 직접 분석하기</h3>
+          <p class="help-text">
+            궁금한 내용을 문장으로 적어 보세요. AI가 허용된 도구와 조건으로 번역하고, 실제 숫자는 <code>pandas</code>가 계산합니다.
+          </p>
+          <div class="row-actions">
+            <input
+              type="text"
+              id="question-input"
+              class="text-input wide-input"
+              placeholder="예: 이든대학에서 1학년 대상 전핵 강좌의 폐강률 알려줘 / 충원율 높은 단과대는?"
+            />
+            <button type="button" id="btn-ask" class="btn primary">질문 분석 실행</button>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <h3>AI 추천 분석 고르기</h3>
+        <p class="help-text">
+          AI에게는 원본 행을 보내지 않고 위 진단 요약만 보내 가능한 분석을 추천받습니다. 원하는 항목을 체크한 뒤 계산을 실행하세요.
+        </p>
+        <div class="row-actions">
+          <button type="button" id="btn-suggest" class="btn secondary">AI 분석 제안 받기</button>
+          <button type="button" id="btn-run" class="btn primary">선택한 분석 계산하기</button>
+        </div>
+
+        <div id="suggest-list" class="suggest-list"></div>
+
+        <details class="manual-tools">
+          <summary>직접 도구 골라서 추가 선택하기 (7개 전체 목록)</summary>
+          <div id="manual-tool-list" class="suggest-list"></div>
+        </details>
+      </section>
+
+      <!-- 4. 계산 결과 영역 -->
+      <section class="card hidden" id="section-results">
+        <h2>4. 계산 결과 (pandas 정확 계산)</h2>
+        <div id="results-container"></div>
+      </section>
+
+      <!-- 5. 보고서 영역 -->
+      <section class="card hidden" id="section-report">
+        <h2>5. AI 해석 보고서 (직접 수정 · 미리보기 · 복사)</h2>
+        <p class="help-text">
+          <strong>모드 A</strong>는 진단 요약만으로 작성한 비교용(허술한 버전), <strong>모드 B</strong>는 계산된 숫자만 인용해 작성하는 정식 보고서입니다.
+        </p>
+        <div class="report-controls">
+          <label class="radio-label">
+            <input type="radio" name="report-mode" value="B" checked />
+            모드 B (정식 보고서 — 계산 결과만 사용)
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="report-mode" value="A" />
+            모드 A (비교용 — 진단 요약만 사용)
+          </label>
+        </div>
+        <div class="row-actions">
+          <button type="button" id="btn-explain" class="btn primary">보고서 생성</button>
+          <button type="button" id="btn-view-preview" class="btn secondary" disabled>미리보기 (깔끔하게 보기)</button>
+          <button type="button" id="btn-view-edit" class="btn secondary" disabled>직접 수정하기</button>
+          <button type="button" id="btn-reset-report" class="btn secondary" disabled>AI 원본 되돌리기</button>
+          <button type="button" id="btn-copy" class="btn secondary" disabled>복사하기</button>
+          <button type="button" id="btn-download" class="btn secondary" disabled>.md 다운로드</button>
+        </div>
+
+        <div id="report-preview" class="report-preview hidden"></div>
+        <textarea
+          id="report-editor"
+          class="report-editor hidden"
+          rows="18"
+          placeholder="여기에 생성된 보고서를 직접 수정할 수 있습니다."
+        ></textarea>
+      </section>
+    </div>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
